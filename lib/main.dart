@@ -1,3 +1,69 @@
+import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
+import 'package:uuid/uuid.dart';
+
+void main() => runApp(ToDoApp());
+
+class ToDoApp extends StatefulWidget {
+  @override
+  _ToDoAppState createState() => _ToDoAppState();
+}
+
+class _ToDoAppState extends State<ToDoApp> {
+  bool _isDarkMode = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadThemePreference();
+  }
+
+  Future<void> _loadThemePreference() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _isDarkMode = prefs.getBool('isDarkMode') ?? false;
+    });
+  }
+
+  Future<void> _saveThemePreference(bool isDarkMode) async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('isDarkMode', isDarkMode);
+  }
+
+  void _toggleTheme(bool isDarkMode) {
+    setState(() {
+      _isDarkMode = isDarkMode;
+    });
+    _saveThemePreference(isDarkMode);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'Flutter To-Do List',
+      theme: ThemeData.light(),
+      darkTheme: ThemeData.dark(),
+      themeMode: _isDarkMode ? ThemeMode.dark : ThemeMode.light,
+      home: ToDoList(
+        isDarkMode: _isDarkMode,
+        toggleTheme: _toggleTheme,
+      ),
+    );
+  }
+}
+
+class ToDoList extends StatefulWidget {
+  final bool isDarkMode;
+  final Function(bool) toggleTheme;
+
+  ToDoList({required this.isDarkMode, required this.toggleTheme});
+
+  @override
+  _ToDoListState createState() => _ToDoListState();
+}
+
+
 class _ToDoListState extends State<ToDoList> {
   List<Map<String, dynamic>> _toDoItems = [];
   final TextEditingController _controller = TextEditingController();
@@ -20,7 +86,8 @@ class _ToDoListState extends State<ToDoList> {
     if (tasksJson != null) {
       List<dynamic> decodedList = jsonDecode(tasksJson);
       setState(() {
-        _toDoItems = List<Map<String, dynamic>>.from(decodedList.map((item) => item as Map<String, dynamic>));
+        _toDoItems = List<Map<String, dynamic>>.from(
+            decodedList.map((item) => item as Map<String, dynamic>));
       });
     }
   }
@@ -61,12 +128,11 @@ class _ToDoListState extends State<ToDoList> {
     _saveToDoList();
   }
 
-  void _toggleAllTasksInCategory(bool isCompleted) {
+  void _toggleAllTasksCompletion(String category, bool isCompleted) {
     setState(() {
-      for (var task in _toDoItems) {
-        if (task['category'] == _selectedCategory) {
-          task['isCompleted'] = isCompleted;
-        }
+      for (var task
+          in _toDoItems.where((item) => item['category'] == category)) {
+        task['isCompleted'] = isCompleted;
       }
     });
     _saveToDoList();
@@ -107,16 +173,30 @@ class _ToDoListState extends State<ToDoList> {
 
     List<Widget> taskWidgets = [];
     categorizedTasks.forEach((category, tasks) {
+      bool allCompleted = tasks.every((task) => task['isCompleted']);
       taskWidgets.add(
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 8.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                category,
-                style: TextStyle(
-                    fontSize: 18, fontWeight: FontWeight.bold, color: Colors.blue),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    category,
+                    style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.blue),
+                  ),
+                  TextButton(
+                    onPressed: () {
+                      _toggleAllTasksCompletion(category, !allCompleted);
+                    },
+                    child: Text(allCompleted ? 'Uncheck All' : 'Check All'),
+                  ),
+                ],
               ),
               Column(
                 children: tasks.map((task) => _buildToDoItem(task)).toList(),
@@ -208,7 +288,8 @@ class _ToDoListState extends State<ToDoList> {
                       ),
                     ),
                     IconButton(
-                      icon: Icon(Icons.add, color: isDarkMode ? Colors.white : Colors.black),
+                      icon: Icon(Icons.add,
+                          color: isDarkMode ? Colors.white : Colors.black),
                       onPressed: () {
                         _addToDoItem(_controller.text, _selectedCategory);
                       },
@@ -226,14 +307,13 @@ class _ToDoListState extends State<ToDoList> {
                       _selectedCategory = newValue!;
                     });
                   },
-                  items: _categories
-                      .map<DropdownMenuItem<String>>((String value) {
+                  items:
+                      _categories.map<DropdownMenuItem<String>>((String value) {
                     return DropdownMenuItem<String>(
                       value: value,
                       child: Text(value,
                           style: TextStyle(
-                              color:
-                                  isDarkMode ? Colors.white : Colors.black)),
+                              color: isDarkMode ? Colors.white : Colors.black)),
                     );
                   }).toList(),
                 ),
@@ -248,8 +328,7 @@ class _ToDoListState extends State<ToDoList> {
                   decoration: InputDecoration(
                     labelText: 'Add new category',
                     filled: true,
-                    fillColor:
-                        isDarkMode ? Colors.grey[800] : Colors.grey[300],
+                    fillColor: isDarkMode ? Colors.grey[800] : Colors.grey[300],
                     labelStyle: TextStyle(
                       color: isDarkMode ? Colors.white : Colors.black,
                     ),
@@ -264,26 +343,6 @@ class _ToDoListState extends State<ToDoList> {
                   _addCategory(_categoryController.text);
                 },
                 child: Text('Add Category'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: isDarkMode ? Colors.grey[700] : Colors.blue,
-                ),
-              ),
-              SizedBox(height: 10),
-              ElevatedButton(
-                onPressed: () {
-                  _toggleAllTasksInCategory(true); // Check all tasks in the selected category
-                },
-                child: Text('Check All in Category'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: isDarkMode ? Colors.grey[700] : Colors.blue,
-                ),
-              ),
-              SizedBox(height: 10),
-              ElevatedButton(
-                onPressed: () {
-                  _toggleAllTasksInCategory(false); // Uncheck all tasks in the selected category
-                },
-                child: Text('Uncheck All in Category'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: isDarkMode ? Colors.grey[700] : Colors.blue,
                 ),
