@@ -1,68 +1,3 @@
-import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'dart:convert';
-import 'package:uuid/uuid.dart';
-
-void main() => runApp(ToDoApp());
-
-class ToDoApp extends StatefulWidget {
-  @override
-  _ToDoAppState createState() => _ToDoAppState();
-}
-
-class _ToDoAppState extends State<ToDoApp> {
-  bool _isDarkMode = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadThemePreference();
-  }
-
-  Future<void> _loadThemePreference() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    setState(() {
-      _isDarkMode = prefs.getBool('isDarkMode') ?? false;
-    });
-  }
-
-  Future<void> _saveThemePreference(bool isDarkMode) async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('isDarkMode', isDarkMode);
-  }
-
-  void _toggleTheme(bool isDarkMode) {
-    setState(() {
-      _isDarkMode = isDarkMode;
-    });
-    _saveThemePreference(isDarkMode);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Flutter To-Do List',
-      theme: ThemeData.light(),
-      darkTheme: ThemeData.dark(),
-      themeMode: _isDarkMode ? ThemeMode.dark : ThemeMode.light,
-      home: ToDoList(
-        isDarkMode: _isDarkMode,
-        toggleTheme: _toggleTheme,
-      ),
-    );
-  }
-}
-
-class ToDoList extends StatefulWidget {
-  final bool isDarkMode;
-  final Function(bool) toggleTheme;
-
-  ToDoList({required this.isDarkMode, required this.toggleTheme});
-
-  @override
-  _ToDoListState createState() => _ToDoListState();
-}
-
 class _ToDoListState extends State<ToDoList> {
   List<Map<String, dynamic>> _toDoItems = [];
   final TextEditingController _controller = TextEditingController();
@@ -85,7 +20,7 @@ class _ToDoListState extends State<ToDoList> {
     if (tasksJson != null) {
       List<dynamic> decodedList = jsonDecode(tasksJson);
       setState(() {
-        _toDoItems = List<Map<String, dynamic>>.from(decodedList);
+        _toDoItems = List<Map<String, dynamic>>.from(decodedList.map((item) => item as Map<String, dynamic>));
       });
     }
   }
@@ -122,6 +57,17 @@ class _ToDoListState extends State<ToDoList> {
   void _removeToDoItem(String taskId) {
     setState(() {
       _toDoItems.removeWhere((item) => item['id'] == taskId);
+    });
+    _saveToDoList();
+  }
+
+  void _toggleAllTasksInCategory(bool isCompleted) {
+    setState(() {
+      for (var task in _toDoItems) {
+        if (task['category'] == _selectedCategory) {
+          task['isCompleted'] = isCompleted;
+        }
+      }
     });
     _saveToDoList();
   }
@@ -314,15 +260,34 @@ class _ToDoListState extends State<ToDoList> {
                 ),
               ),
               ElevatedButton(
-  onPressed: () {
-    _addCategory(_categoryController.text);
-  },
-  child: Text('Add Category'),
-  style: ElevatedButton.styleFrom(
-    backgroundColor: isDarkMode ? Colors.grey[700] : Colors.blue, // Corrected to backgroundColor
-  ),
-),
-
+                onPressed: () {
+                  _addCategory(_categoryController.text);
+                },
+                child: Text('Add Category'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: isDarkMode ? Colors.grey[700] : Colors.blue,
+                ),
+              ),
+              SizedBox(height: 10),
+              ElevatedButton(
+                onPressed: () {
+                  _toggleAllTasksInCategory(true); // Check all tasks in the selected category
+                },
+                child: Text('Check All in Category'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: isDarkMode ? Colors.grey[700] : Colors.blue,
+                ),
+              ),
+              SizedBox(height: 10),
+              ElevatedButton(
+                onPressed: () {
+                  _toggleAllTasksInCategory(false); // Uncheck all tasks in the selected category
+                },
+                child: Text('Uncheck All in Category'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: isDarkMode ? Colors.grey[700] : Colors.blue,
+                ),
+              ),
               SizedBox(height: 10),
               Expanded(
                 child: _buildToDoList(),
